@@ -3,29 +3,42 @@ package br.com.fiap.SpringSecurityInitial.configurations;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
-import br.com.fiap.SpringSecurityInitial.services.UserStubbedDetailService;
 import br.com.fiap.SpringSecurityInitial.support.encoder.PlainTextPasswordEncoder;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
-    private final UserStubbedDetailService _userService;
-
-    public SecurityConfig(final UserStubbedDetailService userService) {
-        this._userService = userService;
+    @Bean
+    AuthenticationManager authenticationManager(HttpSecurity httpSecurity) {
+        final AuthenticationManagerBuilder builder = httpSecurity.getSharedObject(AuthenticationManagerBuilder.class);
+        builder.userDetailsService(userDetails()).passwordEncoder(passwordEncoder());
+        return builder.build();
     }
 
     @Bean
-    AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) {
-        return authenticationConfiguration.getAuthenticationManager();
+    UserDetailsService userDetails() {
+        final InMemoryUserDetailsManager manager = new InMemoryUserDetailsManager();
+        manager.createUser(
+                User.withUsername("usuario")
+                        .password(passwordEncoder().encode("senha"))
+                        .roles("USER")
+                        .build());
+        manager.createUser(
+                User.withUsername("admin")
+                        .password(passwordEncoder().encode("password"))
+                        .roles("ADMIN", "USER")
+                        .build());
+        return manager;
     }
 
     @Bean
@@ -34,20 +47,13 @@ public class SecurityConfig {
     }
 
     @Bean
-    DaoAuthenticationProvider authetnicationProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(_userService);
-        provider.setPasswordEncoder(passwordEncoder());
-        return provider;
-    }
-
-    @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(final HttpSecurity http) throws Exception {
         http.authorizeHttpRequests(authorizeRequest -> {
             authorizeRequest.requestMatchers("/publica").permitAll();
             authorizeRequest.requestMatchers("/logout").permitAll();
             authorizeRequest.anyRequest().authenticated();
         });
-        http.formLogin(Customizer.withDefaults());
+        http.httpBasic(Customizer.withDefaults());
         return http.build();
     }
 }
